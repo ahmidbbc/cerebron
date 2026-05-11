@@ -328,8 +328,8 @@ func TestLogProviderSearchLogsPrefiltersByEnvironmentFamily(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected filter list, got %v", boolBody["filter"])
 	}
-	if len(filters) != 2 {
-		t.Fatalf("expected time and environment filters, got %v", filters)
+	if len(filters) != 3 {
+		t.Fatalf("expected time, environment and severity filters, got %v", filters)
 	}
 
 	environmentFilter, ok := filters[1].(map[string]any)
@@ -414,7 +414,7 @@ func TestLogProviderSearchLogsAddsServiceAndTermsFilters(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected filter list, got %v", boolBody["filter"])
 	}
-	if len(filters) != 4 {
-		t.Fatalf("expected time, environment, service and terms filters, got %v", filters)
+	if len(filters) != 5 {
+		t.Fatalf("expected time, environment, service, terms and severity filters, got %v", filters)
 	}
 }

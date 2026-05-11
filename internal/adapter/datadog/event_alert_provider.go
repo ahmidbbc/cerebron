@@ -12,7 +12,6 @@ import (
 
 	"cerebron/internal/config"
 	"cerebron/internal/domain"
-	"cerebron/internal/port/outbound"
 )
 
 const eventProviderName = "datadog-events"
@@ -102,7 +101,7 @@ func (p EventAlertProvider) FetchAlerts(ctx context.Context, since time.Time) ([
 	return result.Events, nil
 }
 
-func (p EventAlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (outbound.AlertFetchResult, error) {
+func (p EventAlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (alertFetchResult, error) {
 	body, err := json.Marshal(searchEventsRequest{
 		Filter: searchEventsFilter{
 			Query: "source:alert",
@@ -115,7 +114,7 @@ func (p EventAlertProvider) FetchAlertsDebug(ctx context.Context, since time.Tim
 		Sort: "timestamp",
 	})
 	if err != nil {
-		return outbound.AlertFetchResult{}, fmt.Errorf("marshal events request: %w", err)
+		return alertFetchResult{}, fmt.Errorf("marshal events request: %w", err)
 	}
 
 	var lastErr error
@@ -128,7 +127,7 @@ func (p EventAlertProvider) FetchAlertsDebug(ctx context.Context, since time.Tim
 			bytes.NewReader(body),
 		)
 		if err != nil {
-			return outbound.AlertFetchResult{}, fmt.Errorf("create request: %w", err)
+			return alertFetchResult{}, fmt.Errorf("create request: %w", err)
 		}
 
 		request.Header.Set("Accept", "application/json")
@@ -138,7 +137,7 @@ func (p EventAlertProvider) FetchAlertsDebug(ctx context.Context, since time.Tim
 
 		response, err := p.httpClient.Do(request)
 		if err != nil {
-			return outbound.AlertFetchResult{}, fmt.Errorf("perform request: %w", err)
+			return alertFetchResult{}, fmt.Errorf("perform request: %w", err)
 		}
 
 		if response.StatusCode != http.StatusOK {
@@ -148,34 +147,34 @@ func (p EventAlertProvider) FetchAlertsDebug(ctx context.Context, since time.Tim
 				continue
 			}
 
-			return outbound.AlertFetchResult{}, lastErr
+			return alertFetchResult{}, lastErr
 		}
 
 		var payload searchEventsResponse
 		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 			response.Body.Close()
-			return outbound.AlertFetchResult{}, fmt.Errorf("decode events response: %w", err)
+			return alertFetchResult{}, fmt.Errorf("decode events response: %w", err)
 		}
 		response.Body.Close()
 
 		events, debug := p.mapEventItems(payload.Data, since)
 
-		return outbound.AlertFetchResult{
+		return alertFetchResult{
 			Events: events,
 			Debug:  debug,
 		}, nil
 	}
 
 	if lastErr != nil {
-		return outbound.AlertFetchResult{}, lastErr
+		return alertFetchResult{}, lastErr
 	}
 
-	return outbound.AlertFetchResult{}, fmt.Errorf("no datadog base url configured")
+	return alertFetchResult{}, fmt.Errorf("no datadog base url configured")
 }
 
-func (p EventAlertProvider) mapEventItems(items []eventItem, since time.Time) ([]domain.Event, outbound.AlertProviderDebug) {
+func (p EventAlertProvider) mapEventItems(items []eventItem, since time.Time) ([]domain.Event, alertProviderDebug) {
 	events := make([]domain.Event, 0, len(items))
-	debug := outbound.AlertProviderDebug{
+	debug := alertProviderDebug{
 		MonitorsFetched: len(items),
 	}
 
@@ -327,7 +326,7 @@ func matchesAllTags(tags []string, requiredTags []string) bool {
 	return true
 }
 
-func appendEventSamples(debug *outbound.AlertProviderDebug, item eventItem) {
+func appendEventSamples(debug *alertProviderDebug, item eventItem) {
 	title := item.Attributes.Attributes.Title
 	if title == "" {
 		title = item.Attributes.Message

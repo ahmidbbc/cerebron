@@ -122,9 +122,13 @@ func LoadFromEnv() (Config, error) {
 			ChannelID: getEnv("SLACK_CHANNEL_ID", ""),
 		},
 		Storage: StorageConfig{
-			PostgresURL: getEnv("POSTGRES_URL", "postgres://postgres:postgres@localhost:5432/monitoring_agent?sslmode=disable"),
+			PostgresURL: getEnv("POSTGRES_URL", "postgres://postgres:postgres@localhost:5432/cerebron?sslmode=disable"),
 			RedisAddr:   getEnv("REDIS_ADDR", "localhost:6379"),
 		},
+	}
+
+	if cfg.Datadog.ErrorTracking.Query == "" {
+		cfg.Datadog.ErrorTracking.Query = deriveDatadogErrorTrackingQuery(cfg.Datadog.MonitorTags)
 	}
 
 	if cfg.Slack.Enabled && cfg.Slack.ChannelID == "" {
@@ -134,7 +138,7 @@ func LoadFromEnv() (Config, error) {
 		return Config{}, fmt.Errorf("DATADOG_API_KEY and DATADOG_APP_KEY are required when Datadog is enabled")
 	}
 	if cfg.Datadog.ErrorTracking.Enabled && cfg.Datadog.ErrorTracking.Query == "" {
-		return Config{}, fmt.Errorf("DATADOG_ERROR_TRACKING_QUERY is required when Datadog error tracking is enabled")
+		return Config{}, fmt.Errorf("DATADOG_ERROR_TRACKING_QUERY or compatible DATADOG_MONITOR_TAGS are required when Datadog error tracking is enabled")
 	}
 	if cfg.Datadog.ErrorTracking.Enabled && !isValidDatadogErrorTrackingTrack(cfg.Datadog.ErrorTracking.Track) {
 		return Config{}, fmt.Errorf("DATADOG_ERROR_TRACKING_TRACK must be one of trace, logs, rum")
@@ -218,4 +222,30 @@ func isValidDatadogErrorTrackingTrack(track string) bool {
 	default:
 		return false
 	}
+}
+
+func deriveDatadogErrorTrackingQuery(tags []string) string {
+	filters := make([]string, 0, len(tags))
+
+	for _, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
+
+		key, value, ok := strings.Cut(trimmed, ":")
+		if !ok {
+			continue
+		}
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "env", "service":
+			filters = append(filters, trimmed)
+		}
+	}
+
+	return strings.Join(filters, " ")
 }

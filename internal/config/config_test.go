@@ -77,7 +77,23 @@ func TestLoadFromEnvLoadsDatadogErrorTrackingConfig(t *testing.T) {
 	}
 }
 
-func TestLoadFromEnvRequiresDatadogErrorTrackingQueryWhenEnabled(t *testing.T) {
+func TestLoadFromEnvDerivesDatadogErrorTrackingQueryFromMonitorTags(t *testing.T) {
+	t.Setenv("APP_MODE", "test")
+	t.Setenv("DATADOG_API_KEY", "api-key")
+	t.Setenv("DATADOG_APP_KEY", "app-key")
+	t.Setenv("DATADOG_ERROR_TRACKING_ENABLED", "true")
+	t.Setenv("DATADOG_MONITOR_TAGS", "env:preprod,service:presence-api,team:identity")
+
+	cfg, err := LoadFromEnv()
+	if err != nil {
+		t.Fatalf("expected datadog error tracking config to load from monitor tags, got %v", err)
+	}
+	if cfg.Datadog.ErrorTracking.Query != "env:preprod service:presence-api" {
+		t.Fatalf("expected derived error tracking query, got %q", cfg.Datadog.ErrorTracking.Query)
+	}
+}
+
+func TestLoadFromEnvRequiresDatadogErrorTrackingQueryOrCompatibleMonitorTagsWhenEnabled(t *testing.T) {
 	t.Setenv("APP_MODE", "test")
 	t.Setenv("DATADOG_API_KEY", "api-key")
 	t.Setenv("DATADOG_APP_KEY", "app-key")
@@ -85,6 +101,6 @@ func TestLoadFromEnvRequiresDatadogErrorTrackingQueryWhenEnabled(t *testing.T) {
 
 	_, err := LoadFromEnv()
 	if err == nil {
-		t.Fatalf("expected validation error when error tracking query is missing")
+		t.Fatalf("expected validation error when error tracking query and compatible monitor tags are missing")
 	}
 }

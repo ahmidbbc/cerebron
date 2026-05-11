@@ -11,9 +11,8 @@ import (
 	"cerebron/internal/config"
 	handlerhttp "cerebron/internal/handler/http"
 	"cerebron/internal/port/outbound"
+	"cerebron/internal/usecase/analyzeincident"
 	"cerebron/internal/usecase/health"
-	"cerebron/internal/usecase/monitor"
-	reportingusecase "cerebron/internal/usecase/reporting"
 )
 
 type App struct {
@@ -24,19 +23,11 @@ type App struct {
 func New(cfg config.Config) *App {
 	healthService := health.NewService()
 	healthHandler := handlerhttp.NewHealthHandler(healthService)
-	reportingService := reportingusecase.NewService(reportingusecase.DefaultPolicy())
-	alertProviders := buildAlertProviders(cfg)
-	logProviders := buildLogProviders(cfg)
-	monitoringService := monitor.NewService(
-		alertProviders,
-		logProviders,
-		reportingService,
-		cfg.Environment.DefaultPollInterval,
-		cfg.Environment.Mode,
-		cfg.Environment.ObservedEnvs,
-	)
-	monitoringHandler := handlerhttp.NewMonitoringHandler(monitoringService)
-	router := handlerhttp.NewRouter(healthHandler, monitoringHandler)
+	signalProviders := buildProviders(cfg)
+	analyzeIncidentService := analyzeincident.NewService(signalProviders)
+	incidentHandler := handlerhttp.NewIncidentHandler(analyzeIncidentService)
+	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService)
+	router := handlerhttp.NewRouter(healthHandler, incidentHandler, mcpHandler)
 
 	return &App{
 		config: cfg,
@@ -48,28 +39,24 @@ func New(cfg config.Config) *App {
 	}
 }
 
-func buildAlertProviders(cfg config.Config) []outbound.AlertProvider {
-	providers := make([]outbound.AlertProvider, 0)
+func buildProviders(cfg config.Config) []outbound.SignalProvider {
+	var signalProviders []outbound.SignalProvider
 
 	if cfg.Datadog.Enabled {
-		providers = append(providers, datadog.NewAlertProvider(cfg.Datadog))
-		providers = append(providers, datadog.NewEventAlertProvider(cfg.Datadog))
+		alertProvider := datadog.NewAlertProvider(cfg.Datadog)
+		eventAlertProvider := datadog.NewEventAlertProvider(cfg.Datadog)
+		signalProviders = append(signalProviders, alertProvider, eventAlertProvider)
 	}
 	if cfg.Datadog.ErrorTracking.Enabled {
-		providers = append(providers, datadog.NewErrorTrackingProvider(cfg.Datadog))
+		errorTrackingProvider := datadog.NewErrorTrackingProvider(cfg.Datadog)
+		signalProviders = append(signalProviders, errorTrackingProvider)
 	}
-
-	return providers
-}
-
-func buildLogProviders(cfg config.Config) []outbound.LogProvider {
-	providers := make([]outbound.LogProvider, 0)
-
 	if cfg.Elastic.Enabled {
-		providers = append(providers, elasticsearch.NewLogProvider(cfg.Elastic))
+		logProvider := elasticsearch.NewLogProvider(cfg.Elastic)
+		signalProviders = append(signalProviders, logProvider)
 	}
 
-	return providers
+	return signalProviders
 }
 
 func (a *App) Run(ctx context.Context) error {

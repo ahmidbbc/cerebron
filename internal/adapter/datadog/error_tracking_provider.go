@@ -13,7 +13,6 @@ import (
 
 	"cerebron/internal/config"
 	"cerebron/internal/domain"
-	"cerebron/internal/port/outbound"
 )
 
 const errorTrackingProviderName = "datadog-error-tracking"
@@ -186,7 +185,52 @@ func (p ErrorTrackingProvider) FetchAlerts(ctx context.Context, since time.Time)
 	return result.Events, nil
 }
 
-func (p ErrorTrackingProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (outbound.AlertFetchResult, error) {
+func (p ErrorTrackingProvider) fetchAlertsWithQuery(ctx context.Context, since time.Time, query string) ([]domain.Event, error) {
+	tracks := allTracks()
+	type trackResult struct {
+		events []domain.Event
+		err    error
+	}
+	results := make([]trackResult, len(tracks))
+	done := make(chan int, len(tracks))
+
+	for i, track := range tracks {
+		i, track := i, track
+		go func() {
+			pp := p
+			pp.query = query
+			pp.track = track
+			res, err := pp.FetchAlertsDebug(ctx, since)
+			results[i] = trackResult{events: res.Events, err: err}
+			done <- i
+		}()
+	}
+	for range tracks {
+		<-done
+	}
+
+	seen := make(map[string]struct{})
+	merged := make([]domain.Event, 0)
+	for _, r := range results {
+		if r.err != nil {
+			continue
+		}
+		for _, e := range r.events {
+			if _, dup := seen[e.Fingerprint]; dup {
+				continue
+			}
+			seen[e.Fingerprint] = struct{}{}
+			merged = append(merged, e)
+		}
+	}
+	return merged, nil
+}
+
+func allTracks() []string {
+	return []string{"trace", "logs", "rum"}
+}
+
+func (p ErrorTrackingProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (alertFetchResult, error) {
 	body, err := json.Marshal(searchIssuesRequest{
 		Data: searchIssuesRequestData{
 			Attributes: searchIssuesRequestAttributes{
@@ -199,7 +243,7 @@ func (p ErrorTrackingProvider) FetchAlertsDebug(ctx context.Context, since time.
 		},
 	})
 	if err != nil {
-		return outbound.AlertFetchResult{}, fmt.Errorf("marshal error tracking search request: %w", err)
+		return alertFetchResult{}, fmt.Errorf("marshal error tracking search request: %w", err)
 	}
 
 	var lastErr error
@@ -212,7 +256,7 @@ func (p ErrorTrackingProvider) FetchAlertsDebug(ctx context.Context, since time.
 			bytes.NewReader(body),
 		)
 		if err != nil {
-			return outbound.AlertFetchResult{}, fmt.Errorf("create request: %w", err)
+			return alertFetchResult{}, fmt.Errorf("create request: %w", err)
 		}
 
 		request.Header.Set("Accept", "application/json")
@@ -222,7 +266,7 @@ func (p ErrorTrackingProvider) FetchAlertsDebug(ctx context.Context, since time.
 
 		response, err := p.httpClient.Do(request)
 		if err != nil {
-			return outbound.AlertFetchResult{}, fmt.Errorf("perform request: %w", err)
+			return alertFetchResult{}, fmt.Errorf("perform request: %w", err)
 		}
 
 		if response.StatusCode != http.StatusOK {
@@ -232,35 +276,35 @@ func (p ErrorTrackingProvider) FetchAlertsDebug(ctx context.Context, since time.
 				continue
 			}
 
-			return outbound.AlertFetchResult{}, lastErr
+			return alertFetchResult{}, lastErr
 		}
 
 		var payload searchIssuesResponse
 		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 			response.Body.Close()
-			return outbound.AlertFetchResult{}, fmt.Errorf("decode error tracking response: %w", err)
+			return alertFetchResult{}, fmt.Errorf("decode error tracking response: %w", err)
 		}
 		response.Body.Close()
 
 		events, debug := p.mapIssues(ctx, payload, since)
 
-		return outbound.AlertFetchResult{
+		return alertFetchResult{
 			Events: events,
 			Debug:  debug,
 		}, nil
 	}
 
 	if lastErr != nil {
-		return outbound.AlertFetchResult{}, lastErr
+		return alertFetchResult{}, lastErr
 	}
 
-	return outbound.AlertFetchResult{}, fmt.Errorf("no datadog base url configured")
+	return alertFetchResult{}, fmt.Errorf("no datadog base url configured")
 }
 
-func (p ErrorTrackingProvider) mapIssues(ctx context.Context, payload searchIssuesResponse, since time.Time) ([]domain.Event, outbound.AlertProviderDebug) {
+func (p ErrorTrackingProvider) mapIssues(ctx context.Context, payload searchIssuesResponse, since time.Time) ([]domain.Event, alertProviderDebug) {
 	issues, teams := indexErrorTrackingIncludedItems(payload.Included)
 	events := make([]domain.Event, 0, len(payload.Data))
-	debug := outbound.AlertProviderDebug{
+	debug := alertProviderDebug{
 		MonitorsFetched: len(payload.Data),
 	}
 	queryMetadata := extractMetadataFromQuery(p.query)
@@ -877,7 +921,7 @@ func formatUnixMilli(value int64) string {
 	return time.UnixMilli(value).UTC().Format(time.RFC3339)
 }
 
-func appendErrorTrackingSamples(debug *outbound.AlertProviderDebug, issue errorTrackingIssue, queryMetadata queryMetadata, track string) {
+func appendErrorTrackingSamples(debug *alertProviderDebug, issue errorTrackingIssue, queryMetadata queryMetadata, track string) {
 	summary := strings.TrimSpace(issue.Attributes.ErrorType)
 	if summary == "" {
 		summary = strings.TrimSpace(issue.Attributes.ErrorMessage)

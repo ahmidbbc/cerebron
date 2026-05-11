@@ -120,6 +120,7 @@ func (p LogProvider) SearchLogs(ctx context.Context, query domain.LogQuery) ([]d
 	if termsFilter := buildTermsFilter(query.Terms, defaultLogTextFields); termsFilter != nil {
 		filters = append(filters, termsFilter)
 	}
+	filters = append(filters, buildSeverityFilter())
 
 	requestBody := searchRequest{
 		Size: 100,
@@ -281,6 +282,25 @@ func (p LogProvider) mapSearchHit(hit searchHit) (domain.Event, bool) {
 			"route":        route,
 		},
 	}, true
+}
+
+func buildSeverityFilter() any {
+	levels := []string{"error", "err", "warn", "warning", "fatal", "panic", "critical", "crit"}
+	clauses := make([]any, 0, len(levels)*2)
+	for _, lvl := range levels {
+		clauses = append(clauses,
+			map[string]any{"term": map[string]any{"level": lvl}},
+			map[string]any{"term": map[string]any{"level.keyword": lvl}},
+			map[string]any{"term": map[string]any{"log.level": lvl}},
+			map[string]any{"term": map[string]any{"log.level.keyword": lvl}},
+		)
+	}
+	return map[string]any{
+		"bool": map[string]any{
+			"should":               clauses,
+			"minimum_should_match": 1,
+		},
+	}
 }
 
 func buildEnvironmentFilter(environment string, fields []string) any {

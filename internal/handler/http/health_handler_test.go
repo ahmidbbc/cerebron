@@ -24,7 +24,7 @@ func (s healthUseCaseStub) Readiness(context.Context) error {
 func TestHealthHandlerLivenessReturnsOK(t *testing.T) {
 	t.Parallel()
 
-	router := NewRouter(NewHealthHandler(healthUseCaseStub{}), NewMonitoringHandler(monitoringUseCaseStub{}))
+	router := NewRouter(NewHealthHandler(healthUseCaseStub{}), NewIncidentHandler(analyzeIncidentUseCaseStub{}), NewMCPHandler(analyzeIncidentUseCaseStub{}))
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	recorder := httptest.NewRecorder()
 
@@ -38,7 +38,7 @@ func TestHealthHandlerLivenessReturnsOK(t *testing.T) {
 func TestHealthHandlerReadinessReturnsServiceUnavailable(t *testing.T) {
 	t.Parallel()
 
-	router := NewRouter(NewHealthHandler(healthUseCaseStub{readinessErr: errors.New("not ready")}), NewMonitoringHandler(monitoringUseCaseStub{}))
+	router := NewRouter(NewHealthHandler(healthUseCaseStub{readinessErr: errors.New("not ready")}), NewIncidentHandler(analyzeIncidentUseCaseStub{}), NewMCPHandler(analyzeIncidentUseCaseStub{}))
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	recorder := httptest.NewRecorder()
 

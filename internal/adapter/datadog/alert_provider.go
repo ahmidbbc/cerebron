@@ -14,10 +14,23 @@ import (
 
 	"cerebron/internal/config"
 	"cerebron/internal/domain"
-	"cerebron/internal/port/outbound"
 )
 
 const providerName = "datadog"
+
+type alertFetchResult struct {
+	Events []domain.Event
+	Debug  alertProviderDebug
+}
+
+type alertProviderDebug struct {
+	MonitorsFetched    int
+	CandidateEvents    int
+	IgnoredByStatus    int
+	IgnoredBeforeSince int
+	SampleMonitorNames []string
+	SampleTags         []string
+}
 
 var defaultBaseURLs = []string{
 	"https://api.datadoghq.eu",
@@ -89,13 +102,13 @@ func (p AlertProvider) FetchAlerts(ctx context.Context, since time.Time) ([]doma
 	return result.Events, nil
 }
 
-func (p AlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (outbound.AlertFetchResult, error) {
+func (p AlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (alertFetchResult, error) {
 	var lastErr error
 
 	for _, baseURL := range p.baseURLs {
 		endpoint, err := url.Parse(strings.TrimRight(baseURL, "/") + "/api/v1/monitor")
 		if err != nil {
-			return outbound.AlertFetchResult{}, fmt.Errorf("build monitors endpoint: %w", err)
+			return alertFetchResult{}, fmt.Errorf("build monitors endpoint: %w", err)
 		}
 
 		queryValues := endpoint.Query()
@@ -107,7 +120,7 @@ func (p AlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (o
 
 		request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
 		if err != nil {
-			return outbound.AlertFetchResult{}, fmt.Errorf("create request: %w", err)
+			return alertFetchResult{}, fmt.Errorf("create request: %w", err)
 		}
 
 		request.Header.Set("Accept", "application/json")
@@ -116,7 +129,7 @@ func (p AlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (o
 
 		response, err := p.httpClient.Do(request)
 		if err != nil {
-			return outbound.AlertFetchResult{}, fmt.Errorf("perform request: %w", err)
+			return alertFetchResult{}, fmt.Errorf("perform request: %w", err)
 		}
 
 		if response.StatusCode != http.StatusOK {
@@ -125,18 +138,18 @@ func (p AlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (o
 			if shouldRetryWithFallback(response.StatusCode) {
 				continue
 			}
-			return outbound.AlertFetchResult{}, lastErr
+			return alertFetchResult{}, lastErr
 		}
 
 		var payload listMonitorsResponse
 		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 			response.Body.Close()
-			return outbound.AlertFetchResult{}, fmt.Errorf("decode monitors response: %w", err)
+			return alertFetchResult{}, fmt.Errorf("decode monitors response: %w", err)
 		}
 		response.Body.Close()
 
 		events := make([]domain.Event, 0)
-		debug := outbound.AlertProviderDebug{
+		debug := alertProviderDebug{
 			MonitorsFetched: len(payload),
 		}
 		for _, monitor := range payload {
@@ -148,17 +161,17 @@ func (p AlertProvider) FetchAlertsDebug(ctx context.Context, since time.Time) (o
 			debug.IgnoredBeforeSince += monitorDebug.IgnoredBeforeSince
 		}
 
-		return outbound.AlertFetchResult{
+		return alertFetchResult{
 			Events: events,
 			Debug:  debug,
 		}, nil
 	}
 
 	if lastErr != nil {
-		return outbound.AlertFetchResult{}, lastErr
+		return alertFetchResult{}, lastErr
 	}
 
-	return outbound.AlertFetchResult{}, fmt.Errorf("no datadog base url configured")
+	return alertFetchResult{}, fmt.Errorf("no datadog base url configured")
 }
 
 type monitorDebug struct {
@@ -418,7 +431,7 @@ func sanitizeGroupName(group string) string {
 	return replacer.Replace(group)
 }
 
-func appendSamples(debug *outbound.AlertProviderDebug, monitor monitor) {
+func appendSamples(debug *alertProviderDebug, monitor monitor) {
 	if len(debug.SampleMonitorNames) < 5 {
 		debug.SampleMonitorNames = append(debug.SampleMonitorNames, monitor.Name)
 	}

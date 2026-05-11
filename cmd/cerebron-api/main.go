@@ -6,11 +6,15 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/joho/godotenv"
+
 	"cerebron/internal/app"
 	"cerebron/internal/config"
 )
 
 func main() {
+	_ = godotenv.Load()
+
 	cfg, err := config.LoadFromEnv()
 	if err != nil {
 		panic(err)

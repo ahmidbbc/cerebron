@@ -79,10 +79,10 @@ Enable Datadog Error Tracking collection with:
 export DATADOG_ERROR_TRACKING_ENABLED=true
 export DATADOG_ERROR_TRACKING_BASE_URL=https://api.datadoghq.eu
 export DATADOG_ERROR_TRACKING_TRACK=trace
-export DATADOG_ERROR_TRACKING_QUERY='service:presence-api env:preprod'
+export DATADOG_ERROR_TRACKING_QUERY=
 ```
 
-`DATADOG_ERROR_TRACKING_QUERY` is required when Datadog Error Tracking is enabled. For deterministic environment filtering, keep an explicit `env:...` filter in that query because the Error Tracking issue search response does not expose a normalized environment field directly.
+`DATADOG_ERROR_TRACKING_QUERY` is optional when `DATADOG_MONITOR_TAGS` already contains compatible filters such as `env:...` or `service:...`. In that case, Cerebron derives a minimal Error Tracking query automatically from those tags. Keep `DATADOG_ERROR_TRACKING_QUERY` only when you need a narrower Error Tracking search than the generic monitor scope.
 
 Enable Elasticsearch log collection with:
 
