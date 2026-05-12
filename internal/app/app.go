@@ -12,6 +12,7 @@ import (
 	"cerebron/internal/adapter/datadog"
 	"cerebron/internal/adapter/elasticsearch"
 	"cerebron/internal/config"
+	"cerebron/internal/diagnostics"
 	handlerhttp "cerebron/internal/handler/http"
 	"cerebron/internal/logger"
 	"cerebron/internal/metrics"
@@ -28,6 +29,7 @@ type App struct {
 
 func New(cfg config.Config) *App {
 	log := logger.New()
+	diagnostics.RunStartupChecks(context.Background(), cfg, log)
 	reg := prometheus.NewRegistry()
 	m := metrics.New(reg)
 	recorder := metrics.NewRecorder(m)
