@@ -15,8 +15,8 @@ func newMCPRouter() *gin.Engine {
 	return NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger()),
-		testLogger(),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
 	)
 }
 
@@ -53,8 +53,8 @@ func TestMCPHandlerAnalyzeIncidentEndToEnd(t *testing.T) {
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(stub, testLogger()),
-		testLogger(),
+		NewMCPHandler(stub, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
 	)
 
 	// Step 1: initialize the MCP session.
@@ -103,8 +103,8 @@ func TestMCPHandlerToolDelegatesEntirelyToUseCase(t *testing.T) {
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, testLogger()),
-		testLogger(),
+		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
 	)
 
 	initBody := `{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}`

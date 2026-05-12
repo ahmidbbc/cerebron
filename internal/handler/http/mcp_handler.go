@@ -12,6 +12,7 @@ import (
 
 	"cerebron/internal/domain"
 	"cerebron/internal/logger"
+	"cerebron/internal/metrics"
 	"cerebron/internal/usecase/analyzeincident"
 )
 
@@ -23,7 +24,7 @@ type analyzeIncidentParams struct {
 
 // NewMCPHandler returns a gin.HandlerFunc that serves the MCP streamable HTTP protocol.
 // It exposes the analyze_incident tool backed by the given usecase.
-func NewMCPHandler(usecase AnalyzeIncidentUseCase, log *slog.Logger) gin.HandlerFunc {
+func NewMCPHandler(usecase AnalyzeIncidentUseCase, log *slog.Logger, m *metrics.Metrics) gin.HandlerFunc {
 	server := sdkmcp.NewServer(&sdkmcp.Implementation{
 		Name:    "cerebron",
 		Version: "1.0",
@@ -52,6 +53,8 @@ func NewMCPHandler(usecase AnalyzeIncidentUseCase, log *slog.Logger) gin.Handler
 					"latency_ms", latency.Milliseconds(),
 					"error", err,
 				)
+				m.MCPRequestsTotal.WithLabelValues("analyze_incident", "error").Inc()
+				m.MCPRequestsDuration.WithLabelValues("analyze_incident").Observe(latency.Seconds())
 				return nil, domain.IncidentAnalysis{}, err
 			}
 
@@ -61,6 +64,8 @@ func NewMCPHandler(usecase AnalyzeIncidentUseCase, log *slog.Logger) gin.Handler
 				"confidence", result.Confidence,
 				"groups", len(result.Groups),
 			)
+			m.MCPRequestsTotal.WithLabelValues("analyze_incident", "ok").Inc()
+			m.MCPRequestsDuration.WithLabelValues("analyze_incident").Observe(latency.Seconds())
 
 			return nil, result, nil
 		},

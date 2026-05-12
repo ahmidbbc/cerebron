@@ -39,8 +39,8 @@ func TestIncidentHandlerAnalyzeReturnsOK(t *testing.T) {
 				Confidence:   0.0,
 			},
 		}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger()),
-		testLogger(),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
 	)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/incidents/analyze", bytes.NewBufferString(`{"service":"catalog-api","time_range":"1h"}`))
@@ -63,8 +63,8 @@ func TestIncidentHandlerAnalyzeReturnsBadRequestForInvalidTimeRange(t *testing.T
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger()),
-		testLogger(),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
 	)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/incidents/analyze", bytes.NewBufferString(`{"service":"catalog-api","time_range":"invalid"}`))
@@ -84,8 +84,8 @@ func TestIncidentHandlerAnalyzeReturnsInternalServerError(t *testing.T) {
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{err: errors.New("analysis failed")}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger()),
-		testLogger(),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
 	)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/incidents/analyze", bytes.NewBufferString(`{"service":"catalog-api"}`))
@@ -107,8 +107,8 @@ func TestIncidentHandlerAnalyzeAcceptsEmptyTimeRange(t *testing.T) {
 		NewIncidentHandler(analyzeIncidentUseCaseStub{
 			result: domain.IncidentAnalysis{Service: "catalog-api"},
 		}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger()),
-		testLogger(),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
 	)
 
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/incidents/analyze", bytes.NewBufferString(`{"service":"catalog-api"}`))

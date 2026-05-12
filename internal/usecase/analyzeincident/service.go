@@ -17,6 +17,14 @@ import (
 	"cerebron/internal/port/outbound"
 )
 
+// MetricsRecorder receives instrumentation events from the service.
+type MetricsRecorder interface {
+	RecordProviderLatency(provider string, d time.Duration)
+	RecordProviderFailure(provider string)
+	RecordSignalsCollected(provider string, count int)
+	RecordAnalysisResult(groups int, confidence float64)
+}
+
 const defaultGroupWindow = 5 * time.Minute
 const defaultProviderTimeout = 30 * time.Second
 const providerMaxRetries = 2
@@ -33,6 +41,7 @@ type Service struct {
 	providerTimeout time.Duration
 	now             func() time.Time
 	log             *slog.Logger
+	metrics         MetricsRecorder
 }
 
 func NewService(signalProviders []outbound.SignalProvider, log *slog.Logger, opts ...Option) Service {
@@ -59,6 +68,12 @@ func WithProviderTimeout(d time.Duration) Option {
 		if d > 0 {
 			s.providerTimeout = d
 		}
+	}
+}
+
+func WithMetrics(m MetricsRecorder) Option {
+	return func(s *Service) {
+		s.metrics = m
 	}
 }
 
@@ -118,7 +133,7 @@ func (s Service) Run(ctx context.Context, input Input) (domain.IncidentAnalysis,
 	metadata := buildMetadata(signals)
 	serviceLabel := servicesLabel(services)
 
-	return domain.IncidentAnalysis{
+	analysis := domain.IncidentAnalysis{
 		Service:      serviceLabel,
 		TimeRange:    formatTimeRange(since, until),
 		ModelVersion: domain.IncidentAnalysisModelVersion,
@@ -126,7 +141,13 @@ func (s Service) Run(ctx context.Context, input Input) (domain.IncidentAnalysis,
 		Groups:       groups,
 		Summary:      buildAnalysisSummary(serviceLabel, metadata, len(groups)),
 		Confidence:   computeConfidence(groups, metadata),
-	}, nil
+	}
+
+	if s.metrics != nil {
+		s.metrics.RecordAnalysisResult(len(groups), analysis.Confidence)
+	}
+
+	return analysis, nil
 }
 
 func (s Service) collectWithRetry(ctx context.Context, provider outbound.SignalProvider, query outbound.CollectSignalsQuery) ([]domain.Signal, error) {
@@ -145,6 +166,10 @@ func (s Service) collectWithRetry(ctx context.Context, provider outbound.SignalP
 				"signal_count", len(signals),
 				"attempt", attempt,
 			)
+			if s.metrics != nil {
+				s.metrics.RecordProviderLatency(provider.Name(), latency)
+				s.metrics.RecordSignalsCollected(provider.Name(), len(signals))
+			}
 			return signals, nil
 		}
 
@@ -155,10 +180,19 @@ func (s Service) collectWithRetry(ctx context.Context, provider outbound.SignalP
 			"attempt", attempt,
 			"error", err,
 		)
+		if s.metrics != nil {
+			s.metrics.RecordProviderLatency(provider.Name(), latency)
+		}
 
 		if ctx.Err() != nil {
+			if s.metrics != nil {
+				s.metrics.RecordProviderFailure(provider.Name())
+			}
 			return nil, ctx.Err()
 		}
+	}
+	if s.metrics != nil {
+		s.metrics.RecordProviderFailure(provider.Name())
 	}
 	return nil, lastErr
 }

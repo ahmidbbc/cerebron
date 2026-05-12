@@ -7,11 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"cerebron/internal/adapter/datadog"
 	"cerebron/internal/adapter/elasticsearch"
 	"cerebron/internal/config"
 	handlerhttp "cerebron/internal/handler/http"
 	"cerebron/internal/logger"
+	"cerebron/internal/metrics"
 	"cerebron/internal/port/outbound"
 	"cerebron/internal/usecase/analyzeincident"
 	"cerebron/internal/usecase/health"
@@ -25,13 +28,20 @@ type App struct {
 
 func New(cfg config.Config) *App {
 	log := logger.New()
+	reg := prometheus.NewRegistry()
+	m := metrics.New(reg)
+	recorder := metrics.NewRecorder(m)
+
 	healthService := health.NewService()
 	healthHandler := handlerhttp.NewHealthHandler(healthService)
 	signalProviders := buildProviders(cfg)
-	analyzeIncidentService := analyzeincident.NewService(signalProviders, log, analyzeincident.WithProviderTimeout(cfg.Environment.ProviderTimeout))
+	analyzeIncidentService := analyzeincident.NewService(signalProviders, log,
+		analyzeincident.WithProviderTimeout(cfg.Environment.ProviderTimeout),
+		analyzeincident.WithMetrics(recorder),
+	)
 	incidentHandler := handlerhttp.NewIncidentHandler(analyzeIncidentService)
-	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService, log)
-	router := handlerhttp.NewRouter(healthHandler, incidentHandler, mcpHandler, log)
+	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService, log, m)
+	router := handlerhttp.NewRouter(healthHandler, incidentHandler, mcpHandler, log, m, reg)
 
 	return &App{
 		config: cfg,

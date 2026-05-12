@@ -1,6 +1,7 @@
 package handlerhttp
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"cerebron/internal/logger"
+	"cerebron/internal/metrics"
 )
 
 func LoggingMiddleware(log *slog.Logger) gin.HandlerFunc {
@@ -41,6 +43,25 @@ func LoggingMiddleware(log *slog.Logger) gin.HandlerFunc {
 		}
 
 		log.InfoContext(ctx, "http request", fields...)
+	}
+}
+
+func MetricsMiddleware(m *metrics.Metrics) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if c.Request.URL.Path == "/metrics" {
+			c.Next()
+			return
+		}
+		start := time.Now()
+		c.Next()
+		duration := time.Since(start).Seconds()
+		route := c.FullPath()
+		if route == "" {
+			route = "unknown"
+		}
+		statusLabel := fmt.Sprintf("%d", c.Writer.Status())
+		m.HTTPRequestsTotal.WithLabelValues(c.Request.Method, route, statusLabel).Inc()
+		m.HTTPRequestsDuration.WithLabelValues(c.Request.Method, route).Observe(duration)
 	}
 }
 
