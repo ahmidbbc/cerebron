@@ -67,7 +67,7 @@ func TestServiceRunBuildsIncidentAnalysis(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, noopLogger())
 	service.now = func() time.Time { return now }
 
 	analysis, err := service.Run(context.Background(), Input{
@@ -126,7 +126,7 @@ func TestServiceRunFiltersSignalsByServiceAndWindow(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, noopLogger())
 
 	analysis, err := service.Run(context.Background(), Input{
 		Services: []string{"catalog-api"},
@@ -148,33 +148,86 @@ func TestServiceRunFiltersSignalsByServiceAndWindow(t *testing.T) {
 	}
 }
 
-func TestServiceRunReturnsErrorWhenProviderFails(t *testing.T) {
+func TestServiceRunToleratesProviderFailure(t *testing.T) {
 	t.Parallel()
 
 	service := NewService([]outbound.SignalProvider{
+		signalProviderStub{name: "elastic", err: errors.New("boom")},
+	}, noopLogger())
+
+	analysis, err := service.Run(context.Background(), Input{
+		Services: []string{"catalog-api"},
+		Since:    time.Date(2026, 4, 27, 14, 0, 0, 0, time.UTC),
+		Until:    time.Date(2026, 4, 27, 14, 10, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("expected no error on partial failure, got %v", err)
+	}
+	if analysis.Metadata.TotalSignals != 0 {
+		t.Fatalf("expected zero signals when provider fails, got %d", analysis.Metadata.TotalSignals)
+	}
+}
+
+func TestServiceRunPartialSuccessWhenOneProviderFails(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 27, 14, 10, 0, 0, time.UTC)
+	service := NewService([]outbound.SignalProvider{
+		signalProviderStub{name: "datadog", err: errors.New("datadog down")},
 		signalProviderStub{
 			name: "elastic",
-			err:  errors.New("boom"),
+			signals: []domain.Signal{
+				{
+					Source:    domain.SignalSourceElastic,
+					Service:   "catalog-api",
+					Type:      domain.SignalTypeLog,
+					Summary:   "DB timeout",
+					Severity:  domain.SignalSeverityHigh,
+					Timestamp: time.Date(2026, 4, 27, 14, 5, 0, 0, time.UTC),
+				},
+			},
 		},
-	})
+	}, noopLogger())
+	service.now = func() time.Time { return now }
 
-	_, err := service.Run(context.Background(), Input{
+	analysis, err := service.Run(context.Background(), Input{
 		Services: []string{"catalog-api"},
-		Since:   time.Date(2026, 4, 27, 14, 0, 0, 0, time.UTC),
-		Until:   time.Date(2026, 4, 27, 14, 10, 0, 0, time.UTC),
+		Since:    time.Date(2026, 4, 27, 14, 0, 0, 0, time.UTC),
+		Until:    now,
 	})
-	if err == nil {
-		t.Fatal("expected an error, got nil")
+	if err != nil {
+		t.Fatalf("expected no error on partial failure, got %v", err)
 	}
-	if err.Error() != "collect signals from elastic: boom" {
-		t.Fatalf("unexpected error %q", err.Error())
+	if analysis.Metadata.TotalSignals != 1 {
+		t.Fatalf("expected 1 signal from surviving provider, got %d", analysis.Metadata.TotalSignals)
+	}
+}
+
+func TestServiceRunRespectsProviderTimeout(t *testing.T) {
+	t.Parallel()
+
+	slow := &slowProviderStub{delay: 200 * time.Millisecond}
+	service := NewService([]outbound.SignalProvider{slow}, noopLogger(),
+		WithProviderTimeout(10*time.Millisecond),
+	)
+
+	analysis, err := service.Run(context.Background(), Input{
+		Services: []string{"catalog-api"},
+		Since:    time.Date(2026, 4, 27, 14, 0, 0, 0, time.UTC),
+		Until:    time.Date(2026, 4, 27, 14, 10, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("expected no error (timeout is a partial failure), got %v", err)
+	}
+	if analysis.Metadata.TotalSignals != 0 {
+		t.Fatalf("expected zero signals on timeout, got %d", analysis.Metadata.TotalSignals)
 	}
 }
 
 func TestServiceRunAcceptsEmptyServices(t *testing.T) {
 	t.Parallel()
 
-	service := NewService(nil)
+	service := NewService(nil, noopLogger())
 
 	analysis, err := service.Run(context.Background(), Input{
 		Since: time.Date(2026, 4, 27, 14, 0, 0, 0, time.UTC),

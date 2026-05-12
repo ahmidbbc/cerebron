@@ -3,17 +3,23 @@ package analyzeincident
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math"
 	"slices"
 	"sort"
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"cerebron/internal/domain"
+	"cerebron/internal/logger"
 	"cerebron/internal/port/outbound"
 )
 
 const defaultGroupWindow = 5 * time.Minute
+const defaultProviderTimeout = 30 * time.Second
+const providerMaxRetries = 2
 
 type Input struct {
 	Services []string
@@ -24,14 +30,35 @@ type Input struct {
 type Service struct {
 	signalProviders []outbound.SignalProvider
 	groupWindow     time.Duration
+	providerTimeout time.Duration
 	now             func() time.Time
+	log             *slog.Logger
 }
 
-func NewService(signalProviders []outbound.SignalProvider) Service {
-	return Service{
+func NewService(signalProviders []outbound.SignalProvider, log *slog.Logger, opts ...Option) Service {
+	if log == nil {
+		log = slog.Default()
+	}
+	svc := Service{
 		signalProviders: slices.Clone(signalProviders),
 		groupWindow:     defaultGroupWindow,
+		providerTimeout: defaultProviderTimeout,
 		now:             time.Now,
+		log:             log,
+	}
+	for _, o := range opts {
+		o(&svc)
+	}
+	return svc
+}
+
+type Option func(*Service)
+
+func WithProviderTimeout(d time.Duration) Option {
+	return func(s *Service) {
+		if d > 0 {
+			s.providerTimeout = d
+		}
 	}
 }
 
@@ -51,18 +78,38 @@ func (s Service) Run(ctx context.Context, input Input) (domain.IncidentAnalysis,
 		return domain.IncidentAnalysis{}, fmt.Errorf("invalid incident window: since %s after until %s", since.Format(time.RFC3339), until.Format(time.RFC3339))
 	}
 
+	query := outbound.CollectSignalsQuery{
+		Services: services,
+		Since:    since,
+		Until:    until,
+	}
+
+	results := make([][]domain.Signal, len(s.signalProviders))
+
+	g, gCtx := errgroup.WithContext(ctx)
+	for i, provider := range s.signalProviders {
+		i, provider := i, provider
+		g.Go(func() error {
+			providerSignals, err := s.collectWithRetry(gCtx, provider, query)
+			if err != nil {
+				logger.Enrich(s.log, gCtx).ErrorContext(gCtx, "provider failed, skipping",
+					"provider", provider.Name(),
+					"error", err,
+				)
+				return nil
+			}
+			results[i] = providerSignals
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return domain.IncidentAnalysis{}, err
+	}
+
 	seen := make(map[string]struct{})
 	signals := make([]domain.Signal, 0)
-	for _, provider := range s.signalProviders {
-		providerSignals, err := provider.CollectSignals(ctx, outbound.CollectSignalsQuery{
-			Services: services,
-			Since:    since,
-			Until:    until,
-		})
-		if err != nil {
-			return domain.IncidentAnalysis{}, fmt.Errorf("collect signals from %s: %w", provider.Name(), err)
-		}
-
+	for _, providerSignals := range results {
 		signals = append(signals, filterSignals(providerSignals, services, since, until, seen)...)
 	}
 
@@ -80,6 +127,40 @@ func (s Service) Run(ctx context.Context, input Input) (domain.IncidentAnalysis,
 		Summary:      buildAnalysisSummary(serviceLabel, metadata, len(groups)),
 		Confidence:   computeConfidence(groups, metadata),
 	}, nil
+}
+
+func (s Service) collectWithRetry(ctx context.Context, provider outbound.SignalProvider, query outbound.CollectSignalsQuery) ([]domain.Signal, error) {
+	var lastErr error
+	for attempt := 1; attempt <= providerMaxRetries; attempt++ {
+		provCtx, cancel := context.WithTimeout(ctx, s.providerTimeout)
+		start := time.Now()
+		signals, err := provider.CollectSignals(provCtx, query)
+		latency := time.Since(start)
+		cancel()
+
+		if err == nil {
+			logger.Enrich(s.log, ctx).InfoContext(ctx, "provider collected signals",
+				"provider", provider.Name(),
+				"latency_ms", latency.Milliseconds(),
+				"signal_count", len(signals),
+				"attempt", attempt,
+			)
+			return signals, nil
+		}
+
+		lastErr = err
+		logger.Enrich(s.log, ctx).WarnContext(ctx, "provider attempt failed",
+			"provider", provider.Name(),
+			"latency_ms", latency.Milliseconds(),
+			"attempt", attempt,
+			"error", err,
+		)
+
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+	}
+	return nil, lastErr
 }
 
 func normalizeServices(raw []string) []string {

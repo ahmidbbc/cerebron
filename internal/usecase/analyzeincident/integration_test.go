@@ -53,7 +53,7 @@ func TestIntegrationFullFlow(t *testing.T) {
 	svc := NewService([]outbound.SignalProvider{
 		signalProviderStub{name: "datadog", signals: ddSignals},
 		signalProviderStub{name: "elastic", signals: elasticSignals},
-	})
+	}, noopLogger())
 	svc.now = func() time.Time { return until }
 
 	analysis, err := svc.Run(context.Background(), Input{
@@ -168,7 +168,7 @@ func TestIntegrationNoSignalsProducesEmptyAnalysis(t *testing.T) {
 	svc := NewService([]outbound.SignalProvider{
 		signalProviderStub{name: "datadog", signals: nil},
 		signalProviderStub{name: "elastic", signals: nil},
-	})
+	}, noopLogger())
 	svc.now = func() time.Time { return until }
 
 	analysis, err := svc.Run(context.Background(), Input{
@@ -229,7 +229,7 @@ func TestIntegrationSignalsOutsideWindowAreExcluded(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, noopLogger())
 	svc.now = func() time.Time { return until }
 
 	analysis, err := svc.Run(context.Background(), Input{

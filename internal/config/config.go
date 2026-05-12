@@ -28,6 +28,7 @@ type EnvironmentConfig struct {
 	Mode                string
 	ObservedEnvs        []string
 	DefaultPollInterval time.Duration
+	ProviderTimeout     time.Duration
 }
 
 type ProviderConfig struct {
@@ -80,6 +81,7 @@ func LoadFromEnv() (Config, error) {
 			Mode:                getEnv("APP_MODE", "test"),
 			ObservedEnvs:        getListEnv("OBSERVED_ENVS", nil),
 			DefaultPollInterval: getDurationEnv("DEFAULT_POLL_INTERVAL", time.Minute),
+			ProviderTimeout:     getDurationEnv("PROVIDER_TIMEOUT", 30*time.Second),
 		},
 		Datadog: DatadogConfig{
 			BaseURL:     datadogBaseURL,
