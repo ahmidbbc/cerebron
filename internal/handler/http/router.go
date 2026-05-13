@@ -10,7 +10,7 @@ import (
 	"cerebron/internal/metrics"
 )
 
-func NewRouter(healthHandler HealthHandler, incidentHandler IncidentHandler, mcpHandler gin.HandlerFunc, log *slog.Logger, m *metrics.Metrics, gatherer prometheus.Gatherer) *gin.Engine {
+func NewRouter(healthHandler HealthHandler, incidentHandler IncidentHandler, similarIncidentsHandler SimilarIncidentsHandler, mcpHandler gin.HandlerFunc, log *slog.Logger, m *metrics.Metrics, gatherer prometheus.Gatherer) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
@@ -22,6 +22,7 @@ func NewRouter(healthHandler HealthHandler, incidentHandler IncidentHandler, mcp
 	router.HandleMethodNotAllowed = true
 	healthHandler.Register(router)
 	incidentHandler.Register(router)
+	similarIncidentsHandler.Register(router)
 	router.POST("/mcp", mcpHandler)
 	router.GET("/metrics", gin.WrapH(promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{})))
 

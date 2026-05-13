@@ -15,7 +15,8 @@ func newMCPRouter() *gin.Engine {
 	return NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 }
@@ -53,7 +54,8 @@ func TestMCPHandlerAnalyzeIncidentEndToEnd(t *testing.T) {
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(stub, testLogger(), testMetrics()),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(stub, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -103,7 +105,8 @@ func TestMCPHandlerToolDelegatesEntirelyToUseCase(t *testing.T) {
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, testLogger(), testMetrics()),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -136,7 +139,7 @@ func TestMCPHandlerToolDelegatesEntirelyToUseCase(t *testing.T) {
 	}
 }
 
-// 2.4 — MCP handler exposes exactly one tool: analyze_incident.
+// 2.4 — MCP handler exposes both analyze_incident and find_similar_incidents tools.
 func TestMCPHandlerExposesExactlyOneToolAnalyzeIncident(t *testing.T) {
 	t.Parallel()
 
@@ -169,12 +172,8 @@ func TestMCPHandlerExposesExactlyOneToolAnalyzeIncident(t *testing.T) {
 	if !bytes.Contains(body, []byte(`"analyze_incident"`)) {
 		t.Errorf("expected analyze_incident in tools list, got: %s", body)
 	}
-	// Ensure no other tool names are present by checking the tools array has exactly one entry.
-	// The SDK serializes tools as {"tools":[{"name":"..."},...]}
-	first := bytes.Index(body, []byte(`"name"`))
-	last := bytes.LastIndex(body, []byte(`"name"`))
-	if first != last {
-		t.Errorf("expected exactly one tool, but found multiple 'name' fields in: %s", body)
+	if !bytes.Contains(body, []byte(`"find_similar_incidents"`)) {
+		t.Errorf("expected find_similar_incidents in tools list, got: %s", body)
 	}
 }
 

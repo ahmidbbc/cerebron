@@ -19,6 +19,12 @@ grep -rn "FuncName" .
 ```
 Update test call sites in the same pass to avoid compilation failures during `go test`.
 
+This applies to handler constructors too — adding a parameter to `NewRouter`, `NewMCPHandler`,
+or any handler constructor cascades into every test file that calls it:
+```
+grep -rn "NewRouter\|NewMCPHandler\|NewIncidentHandler\|NewSimilarIncidentsHandler" .
+```
+
 ## HTTP endpoint conventions
 
 **New endpoints**

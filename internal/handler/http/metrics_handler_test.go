@@ -20,7 +20,8 @@ func TestMetricsEndpointExposesCerebronMetrics(t *testing.T) {
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), m),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), m),
 		testLogger(), m, reg,
 	)
 

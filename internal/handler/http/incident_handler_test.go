@@ -39,7 +39,8 @@ func TestIncidentHandlerAnalyzeReturnsOK(t *testing.T) {
 				Confidence:   0.0,
 			},
 		}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -63,7 +64,8 @@ func TestIncidentHandlerAnalyzeReturnsBadRequestForInvalidTimeRange(t *testing.T
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -84,7 +86,8 @@ func TestIncidentHandlerAnalyzeReturnsInternalServerError(t *testing.T) {
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{err: errors.New("analysis failed")}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -107,7 +110,8 @@ func TestIncidentHandlerAnalyzeAcceptsEmptyTimeRange(t *testing.T) {
 		NewIncidentHandler(analyzeIncidentUseCaseStub{
 			result: domain.IncidentAnalysis{Service: "catalog-api"},
 		}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, testLogger(), testMetrics()),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 

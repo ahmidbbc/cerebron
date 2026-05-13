@@ -19,6 +19,7 @@ import (
 	"cerebron/internal/port/outbound"
 	"cerebron/internal/storage"
 	"cerebron/internal/usecase/analyzeincident"
+	"cerebron/internal/usecase/findsimilarincidents"
 	"cerebron/internal/usecase/health"
 )
 
@@ -44,9 +45,11 @@ func New(cfg config.Config) *App {
 		analyzeincident.WithMetrics(recorder),
 		analyzeincident.WithRepository(incidentRepo),
 	)
+	similarIncidentsService := findsimilarincidents.NewService(incidentRepo)
 	incidentHandler := handlerhttp.NewIncidentHandler(analyzeIncidentService)
-	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService, log, m)
-	router := handlerhttp.NewRouter(healthHandler, incidentHandler, mcpHandler, log, m, reg)
+	similarIncidentsHandler := handlerhttp.NewSimilarIncidentsHandler(similarIncidentsService)
+	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService, similarIncidentsService, log, m)
+	router := handlerhttp.NewRouter(healthHandler, incidentHandler, similarIncidentsHandler, mcpHandler, log, m, reg)
 
 	return &App{
 		config: cfg,
