@@ -17,6 +17,7 @@ import (
 	"cerebron/internal/logger"
 	"cerebron/internal/metrics"
 	"cerebron/internal/port/outbound"
+	"cerebron/internal/storage"
 	"cerebron/internal/usecase/analyzeincident"
 	"cerebron/internal/usecase/health"
 )
@@ -37,9 +38,11 @@ func New(cfg config.Config) *App {
 	healthService := health.NewService()
 	healthHandler := handlerhttp.NewHealthHandler(healthService)
 	signalProviders := buildProviders(cfg)
+	incidentRepo := storage.NewMemoryIncidentRepository()
 	analyzeIncidentService := analyzeincident.NewService(signalProviders, log,
 		analyzeincident.WithProviderTimeout(cfg.Environment.ProviderTimeout),
 		analyzeincident.WithMetrics(recorder),
+		analyzeincident.WithRepository(incidentRepo),
 	)
 	incidentHandler := handlerhttp.NewIncidentHandler(analyzeIncidentService)
 	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService, log, m)

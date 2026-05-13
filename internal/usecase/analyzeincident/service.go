@@ -36,12 +36,13 @@ type Input struct {
 }
 
 type Service struct {
-	signalProviders []outbound.SignalProvider
-	groupWindow     time.Duration
-	providerTimeout time.Duration
-	now             func() time.Time
-	log             *slog.Logger
-	metrics         MetricsRecorder
+	signalProviders    []outbound.SignalProvider
+	groupWindow        time.Duration
+	providerTimeout    time.Duration
+	now                func() time.Time
+	log                *slog.Logger
+	metrics            MetricsRecorder
+	incidentRepository outbound.IncidentRepository
 }
 
 func NewService(signalProviders []outbound.SignalProvider, log *slog.Logger, opts ...Option) Service {
@@ -74,6 +75,12 @@ func WithProviderTimeout(d time.Duration) Option {
 func WithMetrics(m MetricsRecorder) Option {
 	return func(s *Service) {
 		s.metrics = m
+	}
+}
+
+func WithRepository(r outbound.IncidentRepository) Option {
+	return func(s *Service) {
+		s.incidentRepository = r
 	}
 }
 
@@ -145,6 +152,21 @@ func (s Service) Run(ctx context.Context, input Input) (domain.IncidentAnalysis,
 
 	if s.metrics != nil {
 		s.metrics.RecordAnalysisResult(len(groups), analysis.Confidence)
+	}
+
+	if s.incidentRepository != nil {
+		fingerprint := domain.ComputeFingerprint(analysis)
+		stored := domain.StoredIncident{
+			Fingerprint: fingerprint,
+			Service:     analysis.Service,
+			Analysis:    analysis,
+		}
+		if _, err := s.incidentRepository.Save(ctx, stored); err != nil {
+			logger.Enrich(s.log, ctx).WarnContext(ctx, "failed to persist incident",
+				"fingerprint", fingerprint,
+				"error", err,
+			)
+		}
 	}
 
 	return analysis, nil
