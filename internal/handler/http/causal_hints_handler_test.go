@@ -1,84 +1,40 @@
 package handlerhttp
 
 import (
+	"bytes"
 	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"cerebron/internal/domain"
-	"cerebron/internal/usecase/findsimilarincidents"
 )
 
-var errSentinel = errors.New("usecase failure")
-
-func TestSimilarIncidentsHandlerReturnsBadRequestWhenNeitherParamProvided(t *testing.T) {
+func TestCausalHintsHandlerReturnsOK(t *testing.T) {
 	t.Parallel()
 
-	router := NewRouter(
-		NewHealthHandler(healthUseCaseStub{}),
-		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
-		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
-		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
-		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
-		testLogger(), testMetrics(), testGatherer(),
-	)
-
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/incidents/similar", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", rec.Code)
-	}
-}
-
-func TestSimilarIncidentsHandlerReturnsBadRequestForInvalidLimit(t *testing.T) {
-	t.Parallel()
-
-	router := NewRouter(
-		NewHealthHandler(healthUseCaseStub{}),
-		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
-		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
-		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
-		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
-		testLogger(), testMetrics(), testGatherer(),
-	)
-
-	for _, bad := range []string{"abc", "0", "-1"} {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/incidents/similar?service=svc&limit="+bad, nil)
-		rec := httptest.NewRecorder()
-		router.ServeHTTP(rec, req)
-		if rec.Code != http.StatusBadRequest {
-			t.Fatalf("limit=%q: expected 400, got %d", bad, rec.Code)
-		}
-	}
-}
-
-func TestSimilarIncidentsHandlerReturnsOKForValidRequest(t *testing.T) {
-	t.Parallel()
-
-	stub := findSimilarIncidentsUseCaseStub{
-		result: findsimilarincidents.Result{
-			Related: []domain.StoredIncident{},
+	stub := analyzeCausalHintsUseCaseStub{
+		result: domain.CausalAnalysis{
+			Service: "payments",
+			Hints: []domain.CausalHint{
+				{Rule: domain.CausalRuleDeploymentTriggered, Confidence: 0.8, Evidence: "deploy before incident"},
+			},
 		},
 	}
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewSimilarIncidentsHandler(stub),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
-		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
+		NewCausalHintsHandler(stub),
 		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/incidents/similar?service=catalog-api", nil)
+	body := bytes.NewBufferString(`{"service":"payments","model_version":"v1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/incidents/causal-hints", body)
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -87,14 +43,13 @@ func TestSimilarIncidentsHandlerReturnsOKForValidRequest(t *testing.T) {
 	}
 }
 
-func TestSimilarIncidentsHandlerReturnsInternalServerErrorOnUsecaseFailure(t *testing.T) {
+func TestCausalHintsHandlerReturnsBadRequestForInvalidBody(t *testing.T) {
 	t.Parallel()
 
-	stub := findSimilarIncidentsUseCaseStub{err: errSentinel}
 	router := NewRouter(
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
-		NewSimilarIncidentsHandler(stub),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
@@ -102,7 +57,34 @@ func TestSimilarIncidentsHandlerReturnsInternalServerErrorOnUsecaseFailure(t *te
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/incidents/similar?service=catalog-api", nil)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/incidents/causal-hints", bytes.NewBufferString(`not json`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestCausalHintsHandlerReturnsInternalServerErrorOnUsecaseFailure(t *testing.T) {
+	t.Parallel()
+
+	stub := analyzeCausalHintsUseCaseStub{err: errors.New("causal analysis failed")}
+	router := NewRouter(
+		NewHealthHandler(healthUseCaseStub{}),
+		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
+		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
+		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
+		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
+		NewCausalHintsHandler(stub),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		testLogger(), testMetrics(), testGatherer(),
+	)
+
+	body := bytes.NewBufferString(`{"service":"payments","model_version":"v1"}`)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/incidents/causal-hints", body)
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 

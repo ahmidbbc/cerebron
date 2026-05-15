@@ -29,6 +29,14 @@ const defaultGroupWindow = 5 * time.Minute
 const defaultProviderTimeout = 30 * time.Second
 const providerMaxRetries = 2
 
+// deploymentLookback is how far before `since` we look for deployments that
+// may have caused the incident.
+const deploymentLookback = 2 * time.Hour
+
+// suspectWindow is the maximum gap between a deployment's start time and the
+// earliest signal group start that still qualifies the deployment as suspect.
+const suspectWindow = 1 * time.Hour
+
 type Input struct {
 	Services []string
 	Since    time.Time
@@ -36,13 +44,14 @@ type Input struct {
 }
 
 type Service struct {
-	signalProviders    []outbound.SignalProvider
-	groupWindow        time.Duration
-	providerTimeout    time.Duration
-	now                func() time.Time
-	log                *slog.Logger
-	metrics            MetricsRecorder
-	incidentRepository outbound.IncidentRepository
+	signalProviders     []outbound.SignalProvider
+	deploymentProviders []outbound.DeploymentProvider
+	groupWindow         time.Duration
+	providerTimeout     time.Duration
+	now                 func() time.Time
+	log                 *slog.Logger
+	metrics             MetricsRecorder
+	incidentRepository  outbound.IncidentRepository
 }
 
 func NewService(signalProviders []outbound.SignalProvider, log *slog.Logger, opts ...Option) Service {
@@ -81,6 +90,12 @@ func WithMetrics(m MetricsRecorder) Option {
 func WithRepository(r outbound.IncidentRepository) Option {
 	return func(s *Service) {
 		s.incidentRepository = r
+	}
+}
+
+func WithDeploymentProviders(providers []outbound.DeploymentProvider) Option {
+	return func(s *Service) {
+		s.deploymentProviders = append([]outbound.DeploymentProvider(nil), providers...)
 	}
 }
 
@@ -150,6 +165,10 @@ func (s Service) Run(ctx context.Context, input Input) (domain.IncidentAnalysis,
 		Confidence:   computeConfidence(groups, metadata),
 	}
 
+	if len(s.deploymentProviders) > 0 {
+		analysis.DeploymentContext = s.correlateDeployments(ctx, services, since, until, groups)
+	}
+
 	if s.metrics != nil {
 		s.metrics.RecordAnalysisResult(len(groups), analysis.Confidence)
 	}
@@ -170,6 +189,72 @@ func (s Service) Run(ctx context.Context, input Input) (domain.IncidentAnalysis,
 	}
 
 	return analysis, nil
+}
+
+func (s Service) correlateDeployments(ctx context.Context, services []string, since, until time.Time, groups []domain.SignalGroup) *domain.DeploymentContext {
+	query := outbound.DeploymentQuery{
+		Since: since.Add(-deploymentLookback),
+		Until: until,
+	}
+	// Single-service analysis gets a server-side filter; multi-service skips it to
+	// avoid N×M provider calls — results are naturally scoped by the incident window.
+	if len(services) == 1 {
+		query.Service = services[0]
+	}
+
+	var all []domain.Deployment
+	for _, p := range s.deploymentProviders {
+		deps, err := s.fetchDeploymentsWithTimeout(ctx, p, query)
+		if err != nil {
+			logger.Enrich(s.log, ctx).WarnContext(ctx, "deployment provider failed",
+				"provider", p.Name(),
+				"error", err,
+			)
+			continue
+		}
+		all = append(all, deps...)
+	}
+
+	if len(all) == 0 {
+		return &domain.DeploymentContext{
+			RecentDeployments:  []domain.Deployment{},
+			SuspectDeployments: []domain.Deployment{},
+			RollbackCandidates: []domain.Deployment{},
+		}
+	}
+
+	var earliestGroupStart time.Time
+	for _, g := range groups {
+		if earliestGroupStart.IsZero() || g.WindowStart.Before(earliestGroupStart) {
+			earliestGroupStart = g.WindowStart
+		}
+	}
+
+	suspect := make([]domain.Deployment, 0)
+	rollback := make([]domain.Deployment, 0)
+	for _, d := range all {
+		if !earliestGroupStart.IsZero() {
+			gap := earliestGroupStart.Sub(d.StartedAt)
+			if gap >= 0 && gap <= suspectWindow {
+				suspect = append(suspect, d)
+				if d.Status == domain.DeploymentStatusSuccess {
+					rollback = append(rollback, d)
+				}
+			}
+		}
+	}
+
+	return &domain.DeploymentContext{
+		RecentDeployments:  all,
+		SuspectDeployments: suspect,
+		RollbackCandidates: rollback,
+	}
+}
+
+func (s Service) fetchDeploymentsWithTimeout(ctx context.Context, p outbound.DeploymentProvider, query outbound.DeploymentQuery) ([]domain.Deployment, error) {
+	provCtx, cancel := context.WithTimeout(ctx, s.providerTimeout)
+	defer cancel()
+	return p.FetchDeployments(provCtx, query)
 }
 
 func (s Service) collectWithRetry(ctx context.Context, provider outbound.SignalProvider, query outbound.CollectSignalsQuery) ([]domain.Signal, error) {

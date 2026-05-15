@@ -13,8 +13,11 @@ import (
 	"cerebron/internal/domain"
 	"cerebron/internal/logger"
 	"cerebron/internal/metrics"
+	"cerebron/internal/usecase/analyzecausalhints"
 	"cerebron/internal/usecase/analyzeincident"
+	"cerebron/internal/usecase/detectincidenttrends"
 	"cerebron/internal/usecase/findsimilarincidents"
+	"cerebron/internal/usecase/getservicedependencies"
 )
 
 type analyzeIncidentParams struct {
@@ -29,9 +32,21 @@ type findSimilarIncidentsParams struct {
 	Limit       int    `json:"limit,omitempty"`
 }
 
+type detectIncidentTrendsParams struct {
+	Service string `json:"service,omitempty"`
+}
+
+type getServiceDependenciesParams struct {
+	Service string `json:"service,omitempty"`
+}
+
+type analyzeCausalHintsParams struct {
+	Analysis domain.IncidentAnalysis `json:"analysis"`
+}
+
 // NewMCPHandler returns a gin.HandlerFunc that serves the MCP streamable HTTP protocol.
-// It exposes the analyze_incident and find_similar_incidents tools.
-func NewMCPHandler(usecase AnalyzeIncidentUseCase, similarUsecase FindSimilarIncidentsUseCase, log *slog.Logger, m *metrics.Metrics) gin.HandlerFunc {
+// It exposes analyze_incident, find_similar_incidents, detect_incident_trends, get_service_dependencies, and analyze_causal_hints tools.
+func NewMCPHandler(usecase AnalyzeIncidentUseCase, similarUsecase FindSimilarIncidentsUseCase, trendsUsecase DetectIncidentTrendsUseCase, depsUsecase GetServiceDependenciesUseCase, causalUsecase AnalyzeCausalHintsUseCase, log *slog.Logger, m *metrics.Metrics) gin.HandlerFunc {
 	server := sdkmcp.NewServer(&sdkmcp.Implementation{
 		Name:    "cerebron",
 		Version: "1.0",
@@ -106,6 +121,95 @@ func NewMCPHandler(usecase AnalyzeIncidentUseCase, similarUsecase FindSimilarInc
 			)
 			m.MCPRequestsTotal.WithLabelValues("find_similar_incidents", "ok").Inc()
 			m.MCPRequestsDuration.WithLabelValues("find_similar_incidents").Observe(latency.Seconds())
+
+			return nil, result, nil
+		},
+	)
+
+	sdkmcp.AddTool(server,
+		&sdkmcp.Tool{Name: "detect_incident_trends", Description: "Detect incident frequency, severity trends, and service degradation patterns"},
+		func(ctx context.Context, _ *sdkmcp.CallToolRequest, params detectIncidentTrendsParams) (*sdkmcp.CallToolResult, domain.IncidentTrends, error) {
+			start := time.Now()
+			result, err := trendsUsecase.Run(ctx, detectincidenttrends.Input{Service: params.Service})
+			latency := time.Since(start)
+			if err != nil {
+				logger.Enrich(log, ctx).ErrorContext(ctx, "mcp tool failed",
+					"tool", "detect_incident_trends",
+					"latency_ms", latency.Milliseconds(),
+					"error", err,
+				)
+				m.MCPRequestsTotal.WithLabelValues("detect_incident_trends", "error").Inc()
+				m.MCPRequestsDuration.WithLabelValues("detect_incident_trends").Observe(latency.Seconds())
+				return nil, domain.IncidentTrends{}, err
+			}
+
+			logger.Enrich(log, ctx).InfoContext(ctx, "mcp tool completed",
+				"tool", "detect_incident_trends",
+				"latency_ms", latency.Milliseconds(),
+				"services", len(result.Services),
+			)
+			m.MCPRequestsTotal.WithLabelValues("detect_incident_trends", "ok").Inc()
+			m.MCPRequestsDuration.WithLabelValues("detect_incident_trends").Observe(latency.Seconds())
+
+			return nil, result, nil
+		},
+	)
+
+	sdkmcp.AddTool(server,
+		&sdkmcp.Tool{Name: "get_service_dependencies", Description: "Get upstream/downstream dependencies and blast radius for a service"},
+		func(ctx context.Context, _ *sdkmcp.CallToolRequest, params getServiceDependenciesParams) (*sdkmcp.CallToolResult, domain.ServiceDependencies, error) {
+			start := time.Now()
+			result, err := depsUsecase.Run(ctx, getservicedependencies.Input{Service: params.Service})
+			latency := time.Since(start)
+			if err != nil {
+				logger.Enrich(log, ctx).ErrorContext(ctx, "mcp tool failed",
+					"tool", "get_service_dependencies",
+					"latency_ms", latency.Milliseconds(),
+					"error", err,
+				)
+				m.MCPRequestsTotal.WithLabelValues("get_service_dependencies", "error").Inc()
+				m.MCPRequestsDuration.WithLabelValues("get_service_dependencies").Observe(latency.Seconds())
+				return nil, domain.ServiceDependencies{}, err
+			}
+
+			logger.Enrich(log, ctx).InfoContext(ctx, "mcp tool completed",
+				"tool", "get_service_dependencies",
+				"latency_ms", latency.Milliseconds(),
+				"upstreams", len(result.Upstreams),
+				"downstreams", len(result.Downstreams),
+				"blast_radius", len(result.BlastRadius),
+			)
+			m.MCPRequestsTotal.WithLabelValues("get_service_dependencies", "ok").Inc()
+			m.MCPRequestsDuration.WithLabelValues("get_service_dependencies").Observe(latency.Seconds())
+
+			return nil, result, nil
+		},
+	)
+
+	sdkmcp.AddTool(server,
+		&sdkmcp.Tool{Name: "analyze_causal_hints", Description: "Apply deterministic causal heuristics to an incident analysis (deployment triggers, DB latency, infra degradation)"},
+		func(ctx context.Context, _ *sdkmcp.CallToolRequest, params analyzeCausalHintsParams) (*sdkmcp.CallToolResult, domain.CausalAnalysis, error) {
+			start := time.Now()
+			result, err := causalUsecase.Run(ctx, analyzecausalhints.Input{Analysis: params.Analysis})
+			latency := time.Since(start)
+			if err != nil {
+				logger.Enrich(log, ctx).ErrorContext(ctx, "mcp tool failed",
+					"tool", "analyze_causal_hints",
+					"latency_ms", latency.Milliseconds(),
+					"error", err,
+				)
+				m.MCPRequestsTotal.WithLabelValues("analyze_causal_hints", "error").Inc()
+				m.MCPRequestsDuration.WithLabelValues("analyze_causal_hints").Observe(latency.Seconds())
+				return nil, domain.CausalAnalysis{}, err
+			}
+
+			logger.Enrich(log, ctx).InfoContext(ctx, "mcp tool completed",
+				"tool", "analyze_causal_hints",
+				"latency_ms", latency.Milliseconds(),
+				"hints", len(result.Hints),
+			)
+			m.MCPRequestsTotal.WithLabelValues("analyze_causal_hints", "ok").Inc()
+			m.MCPRequestsDuration.WithLabelValues("analyze_causal_hints").Observe(latency.Seconds())
 
 			return nil, result, nil
 		},

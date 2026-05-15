@@ -14,8 +14,24 @@ type Config struct {
 	Elastic     ElasticConfig
 	Gerrit      ProviderConfig
 	GitHub      ProviderConfig
+	GitLab      GitLabConfig
+	Jenkins     ProviderConfig
+	ArgoCD      ProviderConfig
+	Kubernetes  KubernetesConfig
 	Slack       SlackConfig
 	Storage     StorageConfig
+}
+
+type GitLabConfig struct {
+	ProviderConfig
+	ProjectIDs []string
+}
+
+type KubernetesConfig struct {
+	Enabled      bool
+	Namespaces   []string
+	APIServerURL string
+	Token        string
 }
 
 type HTTPConfig struct {
@@ -114,6 +130,30 @@ func LoadFromEnv() (Config, error) {
 			BaseURL: getEnv("GITHUB_BASE_URL", "https://api.github.com"),
 			Token:   getEnv("GITHUB_TOKEN", ""),
 			Enabled: getBoolEnv("GITHUB_ENABLED", false),
+		},
+		GitLab: GitLabConfig{
+			ProviderConfig: ProviderConfig{
+				BaseURL: getEnv("GITLAB_BASE_URL", "https://gitlab.com"),
+				Token:   getEnv("GITLAB_TOKEN", ""),
+				Enabled: getBoolEnv("GITLAB_ENABLED", false),
+			},
+			ProjectIDs: getListEnv("GITLAB_PROJECT_IDS", nil),
+		},
+		Jenkins: ProviderConfig{
+			BaseURL: getEnv("JENKINS_BASE_URL", ""),
+			Token:   getEnv("JENKINS_TOKEN", ""),
+			Enabled: getBoolEnv("JENKINS_ENABLED", false),
+		},
+		ArgoCD: ProviderConfig{
+			BaseURL: getEnv("ARGOCD_BASE_URL", ""),
+			Token:   getEnv("ARGOCD_TOKEN", ""),
+			Enabled: getBoolEnv("ARGOCD_ENABLED", false),
+		},
+		Kubernetes: KubernetesConfig{
+			Enabled:      getBoolEnv("KUBERNETES_ENABLED", false),
+			Namespaces:   getListEnv("KUBERNETES_NAMESPACES", nil),
+			APIServerURL: getEnv("KUBERNETES_API_SERVER_URL", ""),
+			Token:        getEnv("KUBERNETES_TOKEN", ""),
 		},
 		Slack: SlackConfig{
 			ProviderConfig: ProviderConfig{

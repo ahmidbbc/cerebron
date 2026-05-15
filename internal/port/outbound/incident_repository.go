@@ -18,4 +18,7 @@ type IncidentRepository interface {
 
 	// ListByService returns all stored incidents for a service, newest first.
 	ListByService(ctx context.Context, service string) ([]domain.StoredIncident, error)
+
+	// ListAll returns every stored incident, newest first.
+	ListAll(ctx context.Context) ([]domain.StoredIncident, error)
 }

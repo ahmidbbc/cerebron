@@ -24,7 +24,7 @@ func (s healthUseCaseStub) Readiness(context.Context) error {
 func TestHealthHandlerLivenessReturnsOK(t *testing.T) {
 	t.Parallel()
 
-	router := NewRouter(NewHealthHandler(healthUseCaseStub{}), NewIncidentHandler(analyzeIncidentUseCaseStub{}), NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}), NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()), testLogger(), testMetrics(), testGatherer())
+	router := NewRouter(NewHealthHandler(healthUseCaseStub{}), NewIncidentHandler(analyzeIncidentUseCaseStub{}), NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}), NewTrendsHandler(detectIncidentTrendsUseCaseStub{}), NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}), NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}), NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()), testLogger(), testMetrics(), testGatherer())
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	recorder := httptest.NewRecorder()
 
@@ -38,7 +38,7 @@ func TestHealthHandlerLivenessReturnsOK(t *testing.T) {
 func TestHealthHandlerReadinessReturnsServiceUnavailable(t *testing.T) {
 	t.Parallel()
 
-	router := NewRouter(NewHealthHandler(healthUseCaseStub{readinessErr: errors.New("not ready")}), NewIncidentHandler(analyzeIncidentUseCaseStub{}), NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}), NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()), testLogger(), testMetrics(), testGatherer())
+	router := NewRouter(NewHealthHandler(healthUseCaseStub{readinessErr: errors.New("not ready")}), NewIncidentHandler(analyzeIncidentUseCaseStub{}), NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}), NewTrendsHandler(detectIncidentTrendsUseCaseStub{}), NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}), NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}), NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()), testLogger(), testMetrics(), testGatherer())
 	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 	recorder := httptest.NewRecorder()
 

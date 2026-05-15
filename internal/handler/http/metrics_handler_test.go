@@ -21,7 +21,10 @@ func TestMetricsEndpointExposesCerebronMetrics(t *testing.T) {
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
 		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), m),
+		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
+		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
+		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), m),
 		testLogger(), m, reg,
 	)
 

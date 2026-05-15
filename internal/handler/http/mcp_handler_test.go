@@ -16,7 +16,10 @@ func newMCPRouter() *gin.Engine {
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
 		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
+		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
+		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
+		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 }
@@ -55,7 +58,10 @@ func TestMCPHandlerAnalyzeIncidentEndToEnd(t *testing.T) {
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
 		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
-		NewMCPHandler(stub, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
+		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
+		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
+		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
+		NewMCPHandler(stub, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -106,7 +112,10 @@ func TestMCPHandlerToolDelegatesEntirelyToUseCase(t *testing.T) {
 		NewHealthHandler(healthUseCaseStub{}),
 		NewIncidentHandler(analyzeIncidentUseCaseStub{}),
 		NewSimilarIncidentsHandler(findSimilarIncidentsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, findSimilarIncidentsUseCaseStub{}, testLogger(), testMetrics()),
+		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
+		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
+		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
+		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 

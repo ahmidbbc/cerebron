@@ -75,3 +75,17 @@ func (r *MemoryIncidentRepository) ListByService(ctx context.Context, service st
 	})
 	return out, nil
 }
+
+func (r *MemoryIncidentRepository) ListAll(ctx context.Context) ([]domain.StoredIncident, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	out := make([]domain.StoredIncident, 0, len(r.byID))
+	for _, inc := range r.byID {
+		out = append(out, inc)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.After(out[j].CreatedAt)
+	})
+	return out, nil
+}
