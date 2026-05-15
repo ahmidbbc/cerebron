@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "cerebron": {
+      "type": "http",
+      "url": "http://localhost:8080/mcp",
+      "description": "Cerebron operational intelligence — incident analysis, deployment correlation, causal heuristics"
+    }
+  }
+}

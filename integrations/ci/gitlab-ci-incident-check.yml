@@ -1,0 +1,23 @@
+cerebron-incident-check:
+  stage: deploy
+  image: alpine:latest
+  variables:
+    CEREBRON_URL: "http://cerebron:8080"
+  script:
+    - apk add --no-cache curl jq
+    - |
+      RESPONSE=$(curl -sf -X POST "${CEREBRON_URL}/api/v1/incidents/analyze" \
+        -H "Content-Type: application/json" \
+        -d "{\"service\": \"${CI_PROJECT_NAME}\", \"time_range\": \"15m\"}")
+
+      CONFIDENCE=$(echo "${RESPONSE}" | jq -r '.confidence // 0')
+      SUMMARY=$(echo "${RESPONSE}" | jq -r '.summary // "no summary"')
+
+      echo "Cerebron: ${SUMMARY} (confidence: ${CONFIDENCE})"
+
+      if [ "$(echo "${CONFIDENCE} >= 0.7" | bc -l)" = "1" ]; then
+        echo "High-confidence incident detected. Blocking deployment."
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

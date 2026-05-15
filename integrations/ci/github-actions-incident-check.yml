@@ -1,0 +1,48 @@
+name: Cerebron Incident Check
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      service:
+        description: Service name to analyze
+        required: true
+      cerebron_url:
+        description: Cerebron API base URL
+        default: http://cerebron:8080
+
+jobs:
+  incident-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Analyze incident signals
+        id: analyze
+        run: |
+          SERVICE="${{ github.event.inputs.service || github.event.deployment.environment }}"
+          URL="${{ github.event.inputs.cerebron_url || 'http://cerebron:8080' }}"
+
+          RESPONSE=$(curl -sf -X POST "${URL}/api/v1/incidents/analyze" \
+            -H "Content-Type: application/json" \
+            -d "{\"service\": \"${SERVICE}\", \"time_range\": \"15m\"}")
+
+          CONFIDENCE=$(echo "${RESPONSE}" | jq -r '.confidence // 0')
+          SUMMARY=$(echo "${RESPONSE}" | jq -r '.summary // "no summary"')
+
+          echo "confidence=${CONFIDENCE}" >> "$GITHUB_OUTPUT"
+          echo "summary=${SUMMARY}" >> "$GITHUB_OUTPUT"
+          echo "### Cerebron: ${SUMMARY} (confidence: ${CONFIDENCE})" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Block on high-confidence incident
+        if: ${{ fromJSON(steps.analyze.outputs.confidence) >= 0.7 }}
+        run: |
+          echo "High-confidence incident detected (confidence=${{ steps.analyze.outputs.confidence }})"
+          echo "${{ steps.analyze.outputs.summary }}"
+          exit 1
+
+      - name: Fetch recent deployments
+        run: |
+          SERVICE="${{ github.event.inputs.service || github.event.deployment.environment }}"
+          URL="${{ github.event.inputs.cerebron_url || 'http://cerebron:8080' }}"
+
+          curl -sf "${URL}/api/v1/deployments?service=${SERVICE}&limit=5" \
+            | jq '.deployments[] | "\(.version) by \(.author) — \(.status)"'

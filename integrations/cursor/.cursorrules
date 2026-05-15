@@ -1,0 +1,17 @@
+# Cerebron MCP Integration for Cursor
+
+# Add this to your Cursor MCP settings (Settings → MCP Servers → Add):
+#
+# {
+#   "name": "cerebron",
+#   "url": "http://localhost:8080/mcp"
+# }
+#
+# Available tools:
+#   analyze_incident           — correlate signals for a service
+#   find_similar_incidents     — search incident history by fingerprint or service
+#   detect_incident_trends     — frequency and severity trends across services
+#   get_service_dependencies   — upstream/downstream graph and blast radius
+#   analyze_causal_hints       — deterministic causal heuristics (deployment triggers, DB latency)
+#   get_recent_deployments     — deployments across all configured CI/CD providers
+#   get_incident_history       — full incident history for a service
