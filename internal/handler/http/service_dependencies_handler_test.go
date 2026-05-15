@@ -28,7 +28,7 @@ func TestServiceDependenciesHandlerReturnsOK(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(stub),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -52,7 +52,7 @@ func TestServiceDependenciesHandlerReturnsInternalServerErrorOnUsecaseFailure(t 
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(stub),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 

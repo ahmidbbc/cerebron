@@ -24,7 +24,7 @@ func TestMetricsEndpointExposesCerebronMetrics(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), m),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), m),
 		testLogger(), m, reg,
 	)
 

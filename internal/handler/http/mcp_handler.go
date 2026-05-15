@@ -17,6 +17,8 @@ import (
 	"cerebron/internal/usecase/analyzeincident"
 	"cerebron/internal/usecase/detectincidenttrends"
 	"cerebron/internal/usecase/findsimilarincidents"
+	"cerebron/internal/usecase/getincidenthistory"
+	"cerebron/internal/usecase/getrecentdeployments"
 	"cerebron/internal/usecase/getservicedependencies"
 )
 
@@ -44,9 +46,30 @@ type analyzeCausalHintsParams struct {
 	Analysis domain.IncidentAnalysis `json:"analysis"`
 }
 
+type getRecentDeploymentsParams struct {
+	Service     string `json:"service,omitempty"`
+	Environment string `json:"environment,omitempty"`
+	Limit       int    `json:"limit,omitempty"`
+}
+
+type getIncidentHistoryParams struct {
+	Service string `json:"service,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
+}
+
+// GetRecentDeploymentsUseCase is the contract expected by the get_recent_deployments MCP tool.
+type GetRecentDeploymentsUseCase interface {
+	Run(ctx context.Context, input getrecentdeployments.Input) (getrecentdeployments.Result, error)
+}
+
+// GetIncidentHistoryUseCase is the contract expected by the get_incident_history MCP tool.
+type GetIncidentHistoryUseCase interface {
+	Run(ctx context.Context, input getincidenthistory.Input) (getincidenthistory.Result, error)
+}
+
 // NewMCPHandler returns a gin.HandlerFunc that serves the MCP streamable HTTP protocol.
-// It exposes analyze_incident, find_similar_incidents, detect_incident_trends, get_service_dependencies, and analyze_causal_hints tools.
-func NewMCPHandler(usecase AnalyzeIncidentUseCase, similarUsecase FindSimilarIncidentsUseCase, trendsUsecase DetectIncidentTrendsUseCase, depsUsecase GetServiceDependenciesUseCase, causalUsecase AnalyzeCausalHintsUseCase, log *slog.Logger, m *metrics.Metrics) gin.HandlerFunc {
+// It exposes analyze_incident, find_similar_incidents, detect_incident_trends, get_service_dependencies, analyze_causal_hints, get_recent_deployments, and get_incident_history tools.
+func NewMCPHandler(usecase AnalyzeIncidentUseCase, similarUsecase FindSimilarIncidentsUseCase, trendsUsecase DetectIncidentTrendsUseCase, depsUsecase GetServiceDependenciesUseCase, causalUsecase AnalyzeCausalHintsUseCase, deploymentsUsecase GetRecentDeploymentsUseCase, historyUsecase GetIncidentHistoryUseCase, log *slog.Logger, m *metrics.Metrics) gin.HandlerFunc {
 	server := sdkmcp.NewServer(&sdkmcp.Implementation{
 		Name:    "cerebron",
 		Version: "1.0",
@@ -210,6 +233,72 @@ func NewMCPHandler(usecase AnalyzeIncidentUseCase, similarUsecase FindSimilarInc
 			)
 			m.MCPRequestsTotal.WithLabelValues("analyze_causal_hints", "ok").Inc()
 			m.MCPRequestsDuration.WithLabelValues("analyze_causal_hints").Observe(latency.Seconds())
+
+			return nil, result, nil
+		},
+	)
+
+	sdkmcp.AddTool(server,
+		&sdkmcp.Tool{Name: "get_recent_deployments", Description: "Get recent deployments for a service (required) across all deployment providers"},
+		func(ctx context.Context, _ *sdkmcp.CallToolRequest, params getRecentDeploymentsParams) (*sdkmcp.CallToolResult, getrecentdeployments.Result, error) {
+			start := time.Now()
+			result, err := deploymentsUsecase.Run(ctx, getrecentdeployments.Input{
+				Service:     params.Service,
+				Environment: params.Environment,
+				Limit:       params.Limit,
+			})
+			latency := time.Since(start)
+			if err != nil {
+				logger.Enrich(log, ctx).ErrorContext(ctx, "mcp tool failed",
+					"tool", "get_recent_deployments",
+					"latency_ms", latency.Milliseconds(),
+					"error", err,
+				)
+				m.MCPRequestsTotal.WithLabelValues("get_recent_deployments", "error").Inc()
+				m.MCPRequestsDuration.WithLabelValues("get_recent_deployments").Observe(latency.Seconds())
+				return nil, getrecentdeployments.Result{}, err
+			}
+
+			logger.Enrich(log, ctx).InfoContext(ctx, "mcp tool completed",
+				"tool", "get_recent_deployments",
+				"latency_ms", latency.Milliseconds(),
+				"deployments", len(result.Deployments),
+			)
+			m.MCPRequestsTotal.WithLabelValues("get_recent_deployments", "ok").Inc()
+			m.MCPRequestsDuration.WithLabelValues("get_recent_deployments").Observe(latency.Seconds())
+
+			return nil, result, nil
+		},
+	)
+
+	sdkmcp.AddTool(server,
+		&sdkmcp.Tool{Name: "get_incident_history", Description: "Get historical incidents for a service (required), newest first"},
+		func(ctx context.Context, _ *sdkmcp.CallToolRequest, params getIncidentHistoryParams) (*sdkmcp.CallToolResult, getincidenthistory.Result, error) {
+			start := time.Now()
+			result, err := historyUsecase.Run(ctx, getincidenthistory.Input{
+				Service: params.Service,
+				Limit:   params.Limit,
+			})
+			latency := time.Since(start)
+			if err != nil {
+				logger.Enrich(log, ctx).ErrorContext(ctx, "mcp tool failed",
+					"tool", "get_incident_history",
+					"latency_ms", latency.Milliseconds(),
+					"error", err,
+				)
+				m.MCPRequestsTotal.WithLabelValues("get_incident_history", "error").Inc()
+				m.MCPRequestsDuration.WithLabelValues("get_incident_history").Observe(latency.Seconds())
+				return nil, getincidenthistory.Result{}, err
+			}
+
+			logger.Enrich(log, ctx).InfoContext(ctx, "mcp tool completed",
+				"tool", "get_incident_history",
+				"latency_ms", latency.Milliseconds(),
+				"incidents", len(result.Incidents),
+				"total", result.Total,
+			)
+			m.MCPRequestsTotal.WithLabelValues("get_incident_history", "ok").Inc()
+			m.MCPRequestsDuration.WithLabelValues("get_incident_history").Observe(latency.Seconds())
 
 			return nil, result, nil
 		},

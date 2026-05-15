@@ -28,7 +28,7 @@ func TestCausalHintsHandlerReturnsOK(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(stub),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -53,7 +53,7 @@ func TestCausalHintsHandlerReturnsBadRequestForInvalidBody(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -78,7 +78,7 @@ func TestCausalHintsHandlerReturnsInternalServerErrorOnUsecaseFailure(t *testing
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(stub),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 

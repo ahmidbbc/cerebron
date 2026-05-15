@@ -12,6 +12,8 @@ import (
 	"cerebron/internal/usecase/analyzecausalhints"
 	"cerebron/internal/usecase/detectincidenttrends"
 	"cerebron/internal/usecase/findsimilarincidents"
+	"cerebron/internal/usecase/getincidenthistory"
+	"cerebron/internal/usecase/getrecentdeployments"
 	"cerebron/internal/usecase/getservicedependencies"
 )
 
@@ -71,6 +73,30 @@ type analyzeCausalHintsUseCaseStub struct {
 func (s analyzeCausalHintsUseCaseStub) Run(_ context.Context, _ analyzecausalhints.Input) (domain.CausalAnalysis, error) {
 	if s.err != nil {
 		return domain.CausalAnalysis{}, s.err
+	}
+	return s.result, nil
+}
+
+type getRecentDeploymentsUseCaseStub struct {
+	result getrecentdeployments.Result
+	err    error
+}
+
+func (s getRecentDeploymentsUseCaseStub) Run(_ context.Context, _ getrecentdeployments.Input) (getrecentdeployments.Result, error) {
+	if s.err != nil {
+		return getrecentdeployments.Result{}, s.err
+	}
+	return s.result, nil
+}
+
+type getIncidentHistoryUseCaseStub struct {
+	result getincidenthistory.Result
+	err    error
+}
+
+func (s getIncidentHistoryUseCaseStub) Run(_ context.Context, _ getincidenthistory.Input) (getincidenthistory.Result, error) {
+	if s.err != nil {
+		return getincidenthistory.Result{}, s.err
 	}
 	return s.result, nil
 }

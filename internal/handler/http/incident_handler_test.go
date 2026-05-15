@@ -43,7 +43,7 @@ func TestIncidentHandlerAnalyzeReturnsOK(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -71,7 +71,7 @@ func TestIncidentHandlerAnalyzeReturnsBadRequestForInvalidTimeRange(t *testing.T
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -96,7 +96,7 @@ func TestIncidentHandlerAnalyzeReturnsInternalServerError(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -123,7 +123,7 @@ func TestIncidentHandlerAnalyzeAcceptsEmptyTimeRange(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 

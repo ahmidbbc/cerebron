@@ -28,6 +28,8 @@ import (
 	"cerebron/internal/usecase/analyzeincident"
 	"cerebron/internal/usecase/detectincidenttrends"
 	"cerebron/internal/usecase/findsimilarincidents"
+	"cerebron/internal/usecase/getincidenthistory"
+	"cerebron/internal/usecase/getrecentdeployments"
 	"cerebron/internal/usecase/getservicedependencies"
 	"cerebron/internal/usecase/health"
 )
@@ -60,12 +62,14 @@ func New(cfg config.Config) *App {
 	trendsService := detectincidenttrends.NewService(incidentRepo)
 	depsService := getservicedependencies.NewService(nil)
 	causalService := analyzecausalhints.NewService()
+	recentDeploymentsService := getrecentdeployments.NewService(deploymentProviders)
+	incidentHistoryService := getincidenthistory.NewService(incidentRepo)
 	incidentHandler := handlerhttp.NewIncidentHandler(analyzeIncidentService)
 	similarIncidentsHandler := handlerhttp.NewSimilarIncidentsHandler(similarIncidentsService)
 	trendsHandler := handlerhttp.NewTrendsHandler(trendsService)
 	serviceDepsHandler := handlerhttp.NewServiceDependenciesHandler(depsService)
 	causalHintsHandler := handlerhttp.NewCausalHintsHandler(causalService)
-	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService, similarIncidentsService, trendsService, depsService, causalService, log, m)
+	mcpHandler := handlerhttp.NewMCPHandler(analyzeIncidentService, similarIncidentsService, trendsService, depsService, causalService, recentDeploymentsService, incidentHistoryService, log, m)
 	router := handlerhttp.NewRouter(healthHandler, incidentHandler, similarIncidentsHandler, trendsHandler, serviceDepsHandler, causalHintsHandler, mcpHandler, log, m, reg)
 
 	return &App{

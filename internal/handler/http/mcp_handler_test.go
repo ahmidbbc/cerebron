@@ -19,7 +19,7 @@ func newMCPRouter() *gin.Engine {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 }
@@ -61,7 +61,7 @@ func TestMCPHandlerAnalyzeIncidentEndToEnd(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(stub, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(stub, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -115,7 +115,7 @@ func TestMCPHandlerToolDelegatesEntirelyToUseCase(t *testing.T) {
 		NewTrendsHandler(detectIncidentTrendsUseCaseStub{}),
 		NewServiceDependenciesHandler(getServiceDependenciesUseCaseStub{}),
 		NewCausalHintsHandler(analyzeCausalHintsUseCaseStub{}),
-		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, testLogger(), testMetrics()),
+		NewMCPHandler(analyzeIncidentUseCaseStub{result: expected}, findSimilarIncidentsUseCaseStub{}, detectIncidentTrendsUseCaseStub{}, getServiceDependenciesUseCaseStub{}, analyzeCausalHintsUseCaseStub{}, getRecentDeploymentsUseCaseStub{}, getIncidentHistoryUseCaseStub{}, testLogger(), testMetrics()),
 		testLogger(), testMetrics(), testGatherer(),
 	)
 
@@ -183,6 +183,12 @@ func TestMCPHandlerExposesExactlyOneToolAnalyzeIncident(t *testing.T) {
 	}
 	if !bytes.Contains(body, []byte(`"find_similar_incidents"`)) {
 		t.Errorf("expected find_similar_incidents in tools list, got: %s", body)
+	}
+	if !bytes.Contains(body, []byte(`"get_recent_deployments"`)) {
+		t.Errorf("expected get_recent_deployments in tools list, got: %s", body)
+	}
+	if !bytes.Contains(body, []byte(`"get_incident_history"`)) {
+		t.Errorf("expected get_incident_history in tools list, got: %s", body)
 	}
 }
 
